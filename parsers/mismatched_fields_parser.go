@@ -3,7 +3,7 @@ package parsers
 import (
 	"encoding/json"
 
-	"github.com/block/iterable-go/types"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 func MismatchedFieldsParamsFromResponseBody(body []byte) (types.MismatchedFieldsParams, bool) {

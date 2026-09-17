@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/block/iterable-go/api"
-	iterable_errors "github.com/block/iterable-go/errors"
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/types"
+	"github.com/Three-Ships/iterable-go/api"
+	iterable_errors "github.com/Three-Ships/iterable-go/errors"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 type listUnSubscribeBatch struct {

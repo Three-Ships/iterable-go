@@ -1,7 +1,7 @@
 package iterable_go
 
 import (
-	"github.com/block/iterable-go/batch"
+	"github.com/Three-Ships/iterable-go/batch"
 )
 
 type Batch struct {

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
-	iterable_errors "github.com/block/iterable-go/errors"
-	"github.com/block/iterable-go/types"
+	iterable_errors "github.com/Three-Ships/iterable-go/errors"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 const (

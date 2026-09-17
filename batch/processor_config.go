@@ -3,8 +3,8 @@ package batch
 import (
 	"time"
 
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/retry"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/retry"
 )
 
 type ProcessorConfig struct {

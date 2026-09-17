@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	iterable_go "github.com/block/iterable-go"
+	iterable_go "github.com/Three-Ships/iterable-go"
 )
 
 func api_catalog_get_all(apiKey string) {

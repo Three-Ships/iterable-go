@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/rate"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/rate"
 )
 
 type config struct {

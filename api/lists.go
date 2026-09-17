@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/rate"
-	"github.com/block/iterable-go/types"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/rate"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 var (

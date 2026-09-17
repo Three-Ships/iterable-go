@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/block/iterable-go/errors"
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/rate"
-	"github.com/block/iterable-go/types"
+	"github.com/Three-Ships/iterable-go/errors"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/rate"
+	"github.com/Three-Ships/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
