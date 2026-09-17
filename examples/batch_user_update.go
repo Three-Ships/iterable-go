@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	iterable_go "github.com/block/iterable-go"
-	"github.com/block/iterable-go/batch"
-	"github.com/block/iterable-go/types"
+	iterable_go "github.com/Three-Ships/iterable-go"
+	"github.com/Three-Ships/iterable-go/batch"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 func batch_user_update(apiKey string) {

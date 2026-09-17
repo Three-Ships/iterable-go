@@ -1,6 +1,6 @@
 # Iterable Go Client Library
 
-[![CI](https://github.com/block/iterable-go/actions/workflows/ci.yml/badge.svg)](https://github.com/block/iterable-go/actions/workflows/ci.yml)
+[![CI](https://github.com/Three-Ships/iterable-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Three-Ships/iterable-go/actions/workflows/ci.yml)
 
 A Go (Golang) client library for integrating your applications with the [Iterable](https://www.iterable.com) API.
 
@@ -10,7 +10,7 @@ This library follows the [Iterable API public documentation](https://api.iterabl
 
 [Iterable](https://www.iterable.com) does not provide an official Go (Golang) implementation of their SDK. While other client libraries are available for different programming languages at [https://github.com/iterable](https://github.com/iterable), Go developers needed better support.
 
-Teams at Block use [iterable-go](https://github.com/block/iterable-go) library to send billions of messages to the Iterable API every day.
+Teams at Block use [iterable-go](https://github.com/Three-Ships/iterable-go) library to send billions of messages to the Iterable API every day.
 
 The library provides a comprehensive interface to interact with Iterable's marketing automation platform.
 
@@ -36,7 +36,7 @@ import (
     "fmt"
     "log"
     
-    iterable_go "github.com/block/iterable-go"
+    iterable_go "github.com/Three-Ships/iterable-go"
 )
 
 func main() {

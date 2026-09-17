@@ -1,4 +1,4 @@
-module github.com/block/iterable-go
+module github.com/Three-Ships/iterable-go
 
 go 1.26
 

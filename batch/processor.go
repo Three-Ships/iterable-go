@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/retry"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/retry"
 )
 
 // Processor provides a batching mechanism for processing messages efficiently.

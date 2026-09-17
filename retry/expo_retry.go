@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/block/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/logger"
 )
 
 type expoConfig struct {

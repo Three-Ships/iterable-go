@@ -7,9 +7,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/block/iterable-go/errors"
-	"github.com/block/iterable-go/logger"
-	"github.com/block/iterable-go/rate"
+	"github.com/Three-Ships/iterable-go/errors"
+	"github.com/Three-Ships/iterable-go/logger"
+	"github.com/Three-Ships/iterable-go/rate"
 )
 
 const (

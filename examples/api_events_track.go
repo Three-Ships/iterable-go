@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	iterable_go "github.com/block/iterable-go"
-	"github.com/block/iterable-go/types"
+	iterable_go "github.com/Three-Ships/iterable-go"
+	"github.com/Three-Ships/iterable-go/types"
 )
 
 func api_events_track(apiKey string) {

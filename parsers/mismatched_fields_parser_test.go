@@ -3,7 +3,7 @@ package parsers
 import (
 	"testing"
 
-	"github.com/block/iterable-go/types"
+	"github.com/Three-Ships/iterable-go/types"
 	"github.com/stretchr/testify/assert"
 )
 

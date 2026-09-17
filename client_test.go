@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/block/iterable-go/rate"
+	"github.com/Three-Ships/iterable-go/rate"
 	"github.com/stretchr/testify/assert"
 )
 
