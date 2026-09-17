@@ -74,6 +74,9 @@ func (c *apiClient) sendJson(
 		}
 		return err
 	}
+	if len(body) == 0 {
+		return nil
+	}
 	jsonErr := json.Unmarshal(body, resData)
 	if jsonErr != nil {
 		return &errors.ApiError{
@@ -162,7 +165,7 @@ func (c *apiClient) send(
 		}
 	}
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode < 200 || res.StatusCode > 299 {
 		var body []byte
 		if res.Body != nil {
 			body, _ = io.ReadAll(res.Body)
