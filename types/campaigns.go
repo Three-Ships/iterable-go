@@ -20,11 +20,15 @@ type Campaign struct {
 	RecurringCampaignId int64    `json:"recurringCampaignId,omitempty"`
 	WorkflowId          int64    `json:"workflowId,omitempty"`
 	Labels              []string `json:"labels,omitempty"`
+	LabelIds            []int64  `json:"labelIds,omitempty"`
 	Type                string   `json:"type"`
 }
 
 type CampaignsResponse struct {
-	Campaigns []Campaign `json:"campaigns"`
+	Campaigns           []Campaign `json:"campaigns"`
+	NextPageUrl         string     `json:"nextPageUrl,omitempty"`
+	PreviousPageUrl     string     `json:"previousPageUrl,omitempty"`
+	TotalCampaignsCount int64      `json:"totalCampaignsCount,omitempty"`
 }
 
 type camSendMode struct{}

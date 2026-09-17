@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/block/iterable-go/errors"
 	"github.com/block/iterable-go/logger"
@@ -219,6 +220,14 @@ func notImplemented(httpMethod string, endpoint string) error {
 			"%s %s is not implemented", httpMethod, endpoint,
 		),
 	}
+}
+
+func sanitizeApiPath(raw string) string {
+	raw = strings.TrimPrefix(raw, "https://api.iterable.com/api/")
+	raw = strings.TrimPrefix(raw, "http://api.iterable.com/api/")
+	raw = strings.TrimPrefix(raw, "/api/")
+	raw = strings.TrimPrefix(raw, "/")
+	return raw
 }
 
 type iterableErr struct {

@@ -30,6 +30,24 @@ func (t *Templates) Get() (*types.TemplatesResponse, error) {
 }
 
 func (t *Templates) All() ([]types.Template, error) {
-	var res types.TemplatesResponse
-	return toNilErr(res.Templates, t.api.getJson(PathTemplates, &res))
+	allTemplates := make([]types.Template, 0)
+	path := PathTemplates + "?page=1&pageSize=1000&sort=id"
+	seenUrls := make(map[string]struct{})
+
+	for {
+		var res types.TemplatesResponse
+		if err := t.api.getJson(path, &res); err != nil {
+			return nil, err
+		}
+		allTemplates = append(allTemplates, res.Templates...)
+		if res.NextPageUrl == "" {
+			break
+		}
+		path = sanitizeApiPath(res.NextPageUrl)
+		if _, seen := seenUrls[path]; seen {
+			break
+		}
+		seenUrls[path] = struct{}{}
+	}
+	return allTemplates, nil
 }

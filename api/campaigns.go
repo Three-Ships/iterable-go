@@ -91,6 +91,24 @@ func (c *Campaigns) ChildRecurringCampaigns(campaignId int64) ([]types.Campaign,
 }
 
 func (c *Campaigns) All() ([]types.Campaign, error) {
-	var res types.CampaignsResponse
-	return toNilErr(res.Campaigns, c.api.getJson(PathCampaigns, &res))
+	allCampaigns := make([]types.Campaign, 0)
+	path := PathCampaigns + "?page=1&pageSize=1000&sort=id"
+	seenUrls := make(map[string]struct{})
+
+	for {
+		var res types.CampaignsResponse
+		if err := c.api.getJson(path, &res); err != nil {
+			return nil, err
+		}
+		allCampaigns = append(allCampaigns, res.Campaigns...)
+		if res.NextPageUrl == "" {
+			break
+		}
+		path = sanitizeApiPath(res.NextPageUrl)
+		if _, seen := seenUrls[path]; seen {
+			break
+		}
+		seenUrls[path] = struct{}{}
+	}
+	return allCampaigns, nil
 }
