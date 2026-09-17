@@ -90,25 +90,14 @@ func (c *Campaigns) ChildRecurringCampaigns(campaignId int64) ([]types.Campaign,
 	return toNilErr(res.Campaigns, c.api.getJson(path, &res))
 }
 
+// All retrieves all project campaigns across all available pages (up to 1,000 pages).
 func (c *Campaigns) All() ([]types.Campaign, error) {
-	allCampaigns := make([]types.Campaign, 0)
-	path := PathCampaigns + "?page=1&pageSize=1000&sort=id"
-	seenUrls := make(map[string]struct{})
-
-	for {
-		var res types.CampaignsResponse
-		if err := c.api.getJson(path, &res); err != nil {
-			return nil, err
-		}
-		allCampaigns = append(allCampaigns, res.Campaigns...)
-		if res.NextPageUrl == "" {
-			break
-		}
-		path = sanitizeApiPath(res.NextPageUrl)
-		if _, seen := seenUrls[path]; seen {
-			break
-		}
-		seenUrls[path] = struct{}{}
-	}
-	return allCampaigns, nil
+	return paginate(
+		c.api,
+		PathCampaigns+"?page=1&pageSize=1000&sort=id",
+		PathCampaigns,
+		func(res *types.CampaignsResponse) ([]types.Campaign, string) {
+			return res.Campaigns, res.NextPageUrl
+		},
+	)
 }

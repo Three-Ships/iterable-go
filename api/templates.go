@@ -29,25 +29,14 @@ func (t *Templates) Get() (*types.TemplatesResponse, error) {
 	return toNilErr(&res, t.api.getJson(PathTemplates, &res))
 }
 
+// All retrieves all project templates across all available pages (up to 1,000 pages).
 func (t *Templates) All() ([]types.Template, error) {
-	allTemplates := make([]types.Template, 0)
-	path := PathTemplates + "?page=1&pageSize=1000&sort=id"
-	seenUrls := make(map[string]struct{})
-
-	for {
-		var res types.TemplatesResponse
-		if err := t.api.getJson(path, &res); err != nil {
-			return nil, err
-		}
-		allTemplates = append(allTemplates, res.Templates...)
-		if res.NextPageUrl == "" {
-			break
-		}
-		path = sanitizeApiPath(res.NextPageUrl)
-		if _, seen := seenUrls[path]; seen {
-			break
-		}
-		seenUrls[path] = struct{}{}
-	}
-	return allTemplates, nil
+	return paginate(
+		t.api,
+		PathTemplates+"?page=1&pageSize=1000&sort=id",
+		PathTemplates,
+		func(res *types.TemplatesResponse) ([]types.Template, string) {
+			return res.Templates, res.NextPageUrl
+		},
+	)
 }

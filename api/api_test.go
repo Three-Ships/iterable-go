@@ -260,3 +260,127 @@ func (l *testRateLimiter) setLimitPath(path string) {
 	defer l.mu.Unlock()
 	l.limitByPaths[path] = true
 }
+
+func TestValidatePaginationPath(t *testing.T) {
+	testCases := []struct {
+		name             string
+		raw              string
+		expectedEndpoint string
+		expect           string
+		expectErr        bool
+		errContains      string
+	}{
+		{
+			name:             "relative path with query",
+			raw:              "/api/campaigns?page=2&pageSize=1000&sort=id",
+			expectedEndpoint: "campaigns",
+			expect:           "campaigns?page=2&pageSize=1000&sort=id",
+		},
+		{
+			name:             "absolute iterable https URL with default 443 port",
+			raw:              "https://api.iterable.com:443/api/campaigns?page=2&pageSize=1000&sort=id",
+			expectedEndpoint: "campaigns",
+			expect:           "campaigns?page=2&pageSize=1000&sort=id",
+		},
+		{
+			name:             "unsupported port",
+			raw:              "https://api.iterable.com:8443/api/campaigns",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "unsupported url port",
+		},
+		{
+			name:             "without leading slash",
+			raw:              "api/templates?page=3",
+			expectedEndpoint: "templates",
+			expect:           "templates?page=3",
+		},
+		{
+			name:             "empty URL",
+			raw:              "",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "empty url",
+		},
+		{
+			name:             "unsupported http scheme",
+			raw:              "http://api.iterable.com/api/campaigns",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "unsupported url scheme",
+		},
+		{
+			name:             "untrusted host",
+			raw:              "https://evil.com/api/campaigns",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "untrusted url host",
+		},
+		{
+			name:             "userinfo not allowed",
+			raw:              "https://user:pass@api.iterable.com/api/campaigns",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "url userinfo",
+		},
+		{
+			name:             "path traversal escaping collection",
+			raw:              "/api/campaigns/../../users",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "unexpected endpoint path",
+		},
+		{
+			name:             "sub-path on same collection not allowed",
+			raw:              "/api/campaigns/abort",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "unexpected endpoint path",
+		},
+		{
+			name:             "different collection",
+			raw:              "/api/templates?page=2",
+			expectedEndpoint: "campaigns",
+			expectErr:        true,
+			errContains:      "unexpected endpoint path",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotPath, _, err := validatePaginationPath(tt.raw, tt.expectedEndpoint)
+			if tt.expectErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expect, gotPath)
+			}
+		})
+	}
+}
+
+type scriptedTransport struct {
+	mu     sync.Mutex
+	bodies [][]byte
+	urls   []string
+}
+
+func (t *scriptedTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.urls = append(t.urls, request.URL.String())
+	if len(t.bodies) == 0 {
+		return nil, fmt.Errorf("scriptedTransport: no more response bodies for %s", request.URL.String())
+	}
+	body := t.bodies[0]
+	t.bodies = t.bodies[1:]
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       &testReader{Reader: bytes.NewReader(body)},
+	}, nil
+}

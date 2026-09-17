@@ -1,10 +1,8 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 
@@ -115,44 +113,113 @@ func TestCampaigns_All(t *testing.T) {
 func TestCampaigns_All_Paginates(t *testing.T) {
 	t.Parallel()
 
-	transport := &multiPagesTransport{
-		bodies: [][]byte{
-			[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=2&pageSize=1000&sort=id"}`),
-			[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}]}`),
+	testCases := []struct {
+		name          string
+		bodies        [][]byte
+		expectRes     []types.Campaign
+		expectURLs    []string
+		expectErr     bool
+		wantErrSubstr string
+	}{
+		{
+			name: "relative next page URL",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}]}`),
+			},
+			expectRes: []types.Campaign{
+				{Id: 1, Name: "Campaign 1"},
+				{Id: 2, Name: "Campaign 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "absolute next page URL",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}]}`),
+			},
+			expectRes: []types.Campaign{
+				{Id: 1, Name: "Campaign 1"},
+				{Id: 2, Name: "Campaign 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection on first page",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "repeated next page url",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection across multiple pages",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "repeated next page url",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "invalid next page host",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"https://evil.com/api/campaigns?page=2"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "untrusted url host",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "path traversal in next page URL",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns/../../users"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "unexpected endpoint path",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+			},
 		},
 	}
-	client := &http.Client{Transport: transport}
-	api := NewCampaignsApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
 
-	campaigns, err := api.All()
-	assert.NoError(t, err)
-	assert.Equal(t, []types.Campaign{
-		{Id: 1, Name: "Campaign 1"},
-		{Id: 2, Name: "Campaign 2"},
-	}, campaigns)
-	assert.Equal(t, []string{
-		"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
-		"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
-	}, transport.urls)
-}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-type multiPagesTransport struct {
-	mu     sync.Mutex
-	bodies [][]byte
-	urls   []string
-}
+			transport := &scriptedTransport{bodies: tt.bodies}
+			client := &http.Client{Transport: transport}
+			api := NewCampaignsApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
 
-func (t *multiPagesTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.urls = append(t.urls, request.URL.String())
-	body := t.bodies[0]
-	t.bodies = t.bodies[1:]
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       &testReader{Reader: bytes.NewReader(body)},
-	}, nil
+			campaigns, err := api.All()
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.wantErrSubstr != "" {
+					assert.Contains(t, err.Error(), tt.wantErrSubstr)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectRes, campaigns)
+			}
+			assert.Equal(t, tt.expectURLs, transport.urls)
+		})
+	}
 }
 
 func TestCampaigns_Trigger(t *testing.T) {

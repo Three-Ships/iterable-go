@@ -1,9 +1,7 @@
 package api
 
 import (
-	"bytes"
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/block/iterable-go/errors"
@@ -12,6 +10,7 @@ import (
 	"github.com/block/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTemplatesApi(t *testing.T) {
@@ -194,42 +193,111 @@ func TestTemplates_All(t *testing.T) {
 func TestTemplates_All_Paginates(t *testing.T) {
 	t.Parallel()
 
-	transport := &templatePagesTransport{
-		bodies: [][]byte{
-			[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=2&pageSize=1000&sort=id"}`),
-			[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}]}`),
+	testCases := []struct {
+		name          string
+		bodies        [][]byte
+		expectRes     []types.Template
+		expectURLs    []string
+		expectErr     bool
+		wantErrSubstr string
+	}{
+		{
+			name: "relative next page URL",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}]}`),
+			},
+			expectRes: []types.Template{
+				{TemplateId: 1, Name: "Template 1"},
+				{TemplateId: 2, Name: "Template 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "absolute next page URL",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}]}`),
+			},
+			expectRes: []types.Template{
+				{TemplateId: 1, Name: "Template 1"},
+				{TemplateId: 2, Name: "Template 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection on first page",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "repeated next page url",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection across multiple pages",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "repeated next page url",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "invalid next page host",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"https://evil.com/api/templates?page=2"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "untrusted url host",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "path traversal in next page URL",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates/../../users"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "unexpected endpoint path",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+			},
 		},
 	}
-	client := &http.Client{Transport: transport}
-	api := NewTemplatesApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
 
-	templates, err := api.All()
-	assert.NoError(t, err)
-	assert.Equal(t, []types.Template{
-		{TemplateId: 1, Name: "Template 1"},
-		{TemplateId: 2, Name: "Template 2"},
-	}, templates)
-	assert.Equal(t, []string{
-		"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
-		"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
-	}, transport.urls)
-}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-type templatePagesTransport struct {
-	mu     sync.Mutex
-	bodies [][]byte
-	urls   []string
-}
+			transport := &scriptedTransport{bodies: tt.bodies}
+			client := &http.Client{Transport: transport}
+			api := NewTemplatesApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
 
-func (t *templatePagesTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.urls = append(t.urls, request.URL.String())
-	body := t.bodies[0]
-	t.bodies = t.bodies[1:]
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       &testReader{Reader: bytes.NewReader(body)},
-	}, nil
+			templates, err := api.All()
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.wantErrSubstr != "" {
+					assert.Contains(t, err.Error(), tt.wantErrSubstr)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectRes, templates)
+			}
+			assert.Equal(t, tt.expectURLs, transport.urls)
+		})
+	}
 }
