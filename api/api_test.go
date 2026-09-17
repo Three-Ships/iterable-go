@@ -104,6 +104,17 @@ func Test_getJson(t *testing.T) {
 	}
 }
 
+func Test_sendJson_emptyAcceptedResponse(t *testing.T) {
+	c := httpClient(nil, http.StatusAccepted, nil)
+	api := newApiClient(testApiKey, c, &logger.Noop{}, &rate.NoopLimiter{})
+
+	var res types.PostResponse
+	err := api.sendJson(http.MethodDelete, "subscriptions/messageChannel/123", nil, &res)
+
+	assert.Nil(t, err)
+	assert.Equal(t, types.PostResponse{}, res)
+}
+
 func TestApiClient_RateLimiting(t0 *testing.T) {
 	t0.Run("limited path", func(t *testing.T) {
 		limiter := newTestRateLimiter()

@@ -45,6 +45,14 @@ func TestSubscriptions_UnsubscribeChannelByUserID(t *testing.T) {
 			expectRes: &types.PostResponse{Message: "User unsubscribed", Code: "Success"},
 		},
 		{
+			name:      "accepted response",
+			channelID: 123,
+			userID:    "user@example.com",
+			resCode:   http.StatusAccepted,
+			expectURL: "https://api.iterable.com/api/subscriptions/messageChannel/123/byUserId/user@example.com",
+			expectRes: &types.PostResponse{},
+		},
+		{
 			name:      "escaped user ID",
 			channelID: 123,
 			userID:    "user/name?query=value",
