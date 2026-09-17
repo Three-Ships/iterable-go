@@ -340,7 +340,7 @@ func TestPaginate(t *testing.T) {
 				"campaigns?page=2": "/api/campaigns?page=1",
 			},
 			expectPaths: []string{"campaigns?page=1", "campaigns?page=2"},
-			errContains: "pagination cycle detected",
+			errContains: "duplicate page request",
 		},
 		{
 			name:        "returns fetch error",

@@ -237,7 +237,7 @@ func TestTemplates_All_Paginates(t *testing.T) {
 				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "pagination cycle detected",
+			wantErrSubstr: "duplicate page request",
 			expectURLs: []string{
 				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			},
@@ -249,7 +249,7 @@ func TestTemplates_All_Paginates(t *testing.T) {
 				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "pagination cycle detected",
+			wantErrSubstr: "duplicate page request",
 			expectURLs: []string{
 				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",

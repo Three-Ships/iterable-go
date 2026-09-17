@@ -157,7 +157,7 @@ func TestCampaigns_All_Paginates(t *testing.T) {
 				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "pagination cycle detected",
+			wantErrSubstr: "duplicate page request",
 			expectURLs: []string{
 				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			},
@@ -169,7 +169,7 @@ func TestCampaigns_All_Paginates(t *testing.T) {
 				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "pagination cycle detected",
+			wantErrSubstr: "duplicate page request",
 			expectURLs: []string{
 				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",

@@ -249,7 +249,7 @@ func paginate(pathToFetch string, fetch func(string) (string, error)) error {
 
 	for pathToFetch != "" {
 		if _, exists := seen[pathToFetch]; exists {
-			return fmt.Errorf("duplicate")
+			return fmt.Errorf("duplicate page request")
 		}
 		seen[pathToFetch] = struct{}{}
 
