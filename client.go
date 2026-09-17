@@ -9,14 +9,15 @@ import (
 type Client struct {
 	httpClient *http.Client
 
-	campaigns    *api.Campaigns
-	catalog      *api.Catalog
-	lists        *api.Lists
-	channels     *api.Channels
-	users        *api.Users
-	events       *api.Events
-	messageTypes *api.MessageTypes
-	templates    *api.Templates
+	campaigns     *api.Campaigns
+	catalog       *api.Catalog
+	lists         *api.Lists
+	channels      *api.Channels
+	users         *api.Users
+	events        *api.Events
+	messageTypes  *api.MessageTypes
+	subscriptions *api.Subscriptions
+	templates     *api.Templates
 }
 
 func NewClient(apiKey string, opts ...ConfigOption) *Client {
@@ -30,15 +31,16 @@ func NewClient(apiKey string, opts ...ConfigOption) *Client {
 	httpClient.Timeout = cfg.timeout
 
 	return &Client{
-		httpClient:   httpClient,
-		campaigns:    api.NewCampaignsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		catalog:      api.NewCatalogApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		lists:        api.NewListsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		channels:     api.NewChannelsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		users:        api.NewUsersApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		events:       api.NewEventsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		messageTypes: api.NewMessageTypesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		templates:    api.NewTemplatesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		httpClient:    httpClient,
+		campaigns:     api.NewCampaignsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		catalog:       api.NewCatalogApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		lists:         api.NewListsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		channels:      api.NewChannelsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		users:         api.NewUsersApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		events:        api.NewEventsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		messageTypes:  api.NewMessageTypesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		subscriptions: api.NewSubscriptionsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		templates:     api.NewTemplatesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
 	}
 }
 
@@ -68,6 +70,10 @@ func (c *Client) Events() *api.Events {
 
 func (c *Client) MessageTypes() *api.MessageTypes {
 	return c.messageTypes
+}
+
+func (c *Client) Subscriptions() *api.Subscriptions {
+	return c.subscriptions
 }
 
 func (c *Client) Templates() *api.Templates {
