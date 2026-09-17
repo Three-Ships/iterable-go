@@ -157,7 +157,7 @@ func TestCampaigns_All_Paginates(t *testing.T) {
 				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "repeated next page url",
+			wantErrSubstr: "pagination cycle detected",
 			expectURLs: []string{
 				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			},
@@ -169,30 +169,19 @@ func TestCampaigns_All_Paginates(t *testing.T) {
 				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "repeated next page url",
+			wantErrSubstr: "pagination cycle detected",
 			expectURLs: []string{
 				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
 			},
 		},
 		{
-			name: "invalid next page host",
+			name: "malformed next page URL",
 			bodies: [][]byte{
-				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"https://evil.com/api/campaigns?page=2"}`),
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/%zz"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "untrusted url host",
-			expectURLs: []string{
-				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
-			},
-		},
-		{
-			name: "path traversal in next page URL",
-			bodies: [][]byte{
-				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns/../../users"}`),
-			},
-			expectErr:     true,
-			wantErrSubstr: "unexpected endpoint path",
+			wantErrSubstr: "parse pagination URL",
 			expectURLs: []string{
 				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			},

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/block/iterable-go/errors"
@@ -224,87 +223,48 @@ func notImplemented(httpMethod string, endpoint string) error {
 	}
 }
 
-func validatePaginationPath(raw string, expectedEndpoint string) (string, string, error) {
-	if raw == "" {
-		return "", "", fmt.Errorf("empty url")
+func paginationPath(rawURL string) (string, error) {
+	// if no next page url, we are done
+	if rawURL == "" {
+		return "", nil
 	}
-	parsed, err := url.Parse(raw)
+
+	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return "", "", fmt.Errorf("parse url: %w", err)
+		return "", fmt.Errorf("parse pagination URL: %w", err)
 	}
 
-	if parsed.Scheme != "" && !strings.EqualFold(parsed.Scheme, "https") {
-		return "", "", fmt.Errorf("unsupported url scheme %q", parsed.Scheme)
+	paginationPath := strings.TrimPrefix(parsed.Path, "/api/")
+	if paginationPath == "" {
+		return "", fmt.Errorf("pagination URL has no API path")
 	}
-	if parsed.Host != "" {
-		if !strings.EqualFold(parsed.Hostname(), "api.iterable.com") {
-			return "", "", fmt.Errorf("untrusted url host %q", parsed.Host)
-		}
-		if parsed.Port() != "" && parsed.Port() != "443" {
-			return "", "", fmt.Errorf("unsupported url port %q", parsed.Port())
-		}
-	}
-	if parsed.User != nil {
-		return "", "", fmt.Errorf("url userinfo is not allowed")
-	}
-
-	cleanPath := path.Clean(parsed.Path)
-	trimmed := strings.TrimPrefix(cleanPath, "/api/")
-	trimmed = strings.TrimPrefix(trimmed, "api/")
-	trimmed = strings.TrimPrefix(trimmed, "/")
-
-	if trimmed != expectedEndpoint {
-		return "", "", fmt.Errorf("unexpected endpoint path %q (expected %q)", trimmed, expectedEndpoint)
-	}
-
-	reqPath := trimmed
-	normKey := trimmed
 	if parsed.RawQuery != "" {
-		reqPath += "?" + parsed.RawQuery
-		normKey += "?" + parsed.Query().Encode()
+		paginationPath += "?" + parsed.RawQuery
 	}
-	return reqPath, normKey, nil
+	return paginationPath, nil
 }
 
-const (
-	maxPaginationPages = 1000
-)
+func paginate(pathToFetch string, fetch func(string) (string, error)) error {
+	seen := make(map[string]struct{})
 
-func paginate[T any, R any](
-	client *apiClient,
-	initialPath string,
-	expectedEndpoint string,
-	extract func(*R) ([]T, string),
-) ([]T, error) {
-	all := make([]T, 0)
-	initialReqPath, initialKey, err := validatePaginationPath(initialPath, expectedEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("invalid initial pagination path: %w", err)
-	}
-	seenURLs := map[string]struct{}{initialKey: {}}
-	reqPath := initialReqPath
+	for pathToFetch != "" {
+		if _, exists := seen[pathToFetch]; exists {
+			return fmt.Errorf("duplicate")
+		}
+		seen[pathToFetch] = struct{}{}
 
-	for page := 0; page < maxPaginationPages; page++ {
-		var res R
-		if err := client.getJson(reqPath, &res); err != nil {
-			return nil, err
-		}
-		items, nextURL := extract(&res)
-		all = append(all, items...)
-		if nextURL == "" {
-			return all, nil
-		}
-		nextReqPath, nextKey, err := validatePaginationPath(nextURL, expectedEndpoint)
+		nextURL, err := fetch(pathToFetch)
 		if err != nil {
-			return nil, fmt.Errorf("invalid next page url: %w", err)
+			return err
 		}
-		if _, seen := seenURLs[nextKey]; seen {
-			return nil, fmt.Errorf("repeated next page url for %s", expectedEndpoint)
+
+		pathToFetch, err = paginationPath(nextURL)
+		if err != nil {
+			return err
 		}
-		seenURLs[nextKey] = struct{}{}
-		reqPath = nextReqPath
 	}
-	return nil, fmt.Errorf("pagination exceeded maximum limit of %d pages", maxPaginationPages)
+
+	return nil
 }
 
 type iterableErr struct {

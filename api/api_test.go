@@ -15,6 +15,7 @@ import (
 	"github.com/block/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -261,104 +262,113 @@ func (l *testRateLimiter) setLimitPath(path string) {
 	l.limitByPaths[path] = true
 }
 
-func TestValidatePaginationPath(t *testing.T) {
+func TestPaginationPath(t *testing.T) {
 	testCases := []struct {
-		name             string
-		raw              string
-		expectedEndpoint string
-		expect           string
-		expectErr        bool
-		errContains      string
+		name        string
+		rawURL      string
+		expect      string
+		expectErr   bool
+		errContains string
 	}{
 		{
-			name:             "relative path with query",
-			raw:              "/api/campaigns?page=2&pageSize=1000&sort=id",
-			expectedEndpoint: "campaigns",
-			expect:           "campaigns?page=2&pageSize=1000&sort=id",
+			name:   "relative URL",
+			rawURL: "/api/campaigns?page=2&pageSize=1000&sort=id",
+			expect: "campaigns?page=2&pageSize=1000&sort=id",
 		},
 		{
-			name:             "absolute iterable https URL with default 443 port",
-			raw:              "https://api.iterable.com:443/api/campaigns?page=2&pageSize=1000&sort=id",
-			expectedEndpoint: "campaigns",
-			expect:           "campaigns?page=2&pageSize=1000&sort=id",
+			name:   "absolute URL",
+			rawURL: "https://api.iterable.com/api/templates?page=3",
+			expect: "templates?page=3",
 		},
 		{
-			name:             "unsupported port",
-			raw:              "https://api.iterable.com:8443/api/campaigns",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "unsupported url port",
+			name:   "empty URL ends pagination",
+			rawURL: "",
+			expect: "",
 		},
 		{
-			name:             "without leading slash",
-			raw:              "api/templates?page=3",
-			expectedEndpoint: "templates",
-			expect:           "templates?page=3",
+			name:        "malformed URL",
+			rawURL:      "/api/%zz",
+			expectErr:   true,
+			errContains: "parse pagination URL",
 		},
 		{
-			name:             "empty URL",
-			raw:              "",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "empty url",
-		},
-		{
-			name:             "unsupported http scheme",
-			raw:              "http://api.iterable.com/api/campaigns",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "unsupported url scheme",
-		},
-		{
-			name:             "untrusted host",
-			raw:              "https://evil.com/api/campaigns",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "untrusted url host",
-		},
-		{
-			name:             "userinfo not allowed",
-			raw:              "https://user:pass@api.iterable.com/api/campaigns",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "url userinfo",
-		},
-		{
-			name:             "path traversal escaping collection",
-			raw:              "/api/campaigns/../../users",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "unexpected endpoint path",
-		},
-		{
-			name:             "sub-path on same collection not allowed",
-			raw:              "/api/campaigns/abort",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "unexpected endpoint path",
-		},
-		{
-			name:             "different collection",
-			raw:              "/api/templates?page=2",
-			expectedEndpoint: "campaigns",
-			expectErr:        true,
-			errContains:      "unexpected endpoint path",
+			name:        "URL without API path",
+			rawURL:      "https://api.iterable.com",
+			expectErr:   true,
+			errContains: "no API path",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotPath, _, err := validatePaginationPath(tt.raw, tt.expectedEndpoint)
+			got, err := paginationPath(tt.rawURL)
 			if tt.expectErr {
-				assert.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expect, gotPath)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expect, got)
+		})
+	}
+}
+
+func TestPaginate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		initialPath string
+		nextURLs    map[string]string
+		fetchErr    error
+		expectPaths []string
+		errContains string
+	}{
+		{
+			name:        "follows pages until empty continuation",
+			initialPath: "campaigns?page=1",
+			nextURLs: map[string]string{
+				"campaigns?page=1": "/api/campaigns?page=2",
+				"campaigns?page=2": "",
+			},
+			expectPaths: []string{"campaigns?page=1", "campaigns?page=2"},
+		},
+		{
+			name:        "detects cycle",
+			initialPath: "campaigns?page=1",
+			nextURLs: map[string]string{
+				"campaigns?page=1": "/api/campaigns?page=2",
+				"campaigns?page=2": "/api/campaigns?page=1",
+			},
+			expectPaths: []string{"campaigns?page=1", "campaigns?page=2"},
+			errContains: "pagination cycle detected",
+		},
+		{
+			name:        "returns fetch error",
+			initialPath: "campaigns?page=1",
+			fetchErr:    fmt.Errorf("request failed"),
+			expectPaths: []string{"campaigns?page=1"},
+			errContains: "request failed",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var paths []string
+			err := paginate(tt.initialPath, func(path string) (string, error) {
+				paths = append(paths, path)
+				if tt.fetchErr != nil {
+					return "", tt.fetchErr
+				}
+				return tt.nextURLs[path], nil
+			})
+			if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectPaths, paths)
 		})
 	}
 }

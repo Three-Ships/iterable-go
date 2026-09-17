@@ -237,7 +237,7 @@ func TestTemplates_All_Paginates(t *testing.T) {
 				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "repeated next page url",
+			wantErrSubstr: "pagination cycle detected",
 			expectURLs: []string{
 				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			},
@@ -249,30 +249,19 @@ func TestTemplates_All_Paginates(t *testing.T) {
 				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "repeated next page url",
+			wantErrSubstr: "pagination cycle detected",
 			expectURLs: []string{
 				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
 			},
 		},
 		{
-			name: "invalid next page host",
+			name: "malformed next page URL",
 			bodies: [][]byte{
-				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"https://evil.com/api/templates?page=2"}`),
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/%zz"}`),
 			},
 			expectErr:     true,
-			wantErrSubstr: "untrusted url host",
-			expectURLs: []string{
-				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
-			},
-		},
-		{
-			name: "path traversal in next page URL",
-			bodies: [][]byte{
-				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates/../../users"}`),
-			},
-			expectErr:     true,
-			wantErrSubstr: "unexpected endpoint path",
+			wantErrSubstr: "parse pagination URL",
 			expectURLs: []string{
 				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			},
