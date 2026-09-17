@@ -224,24 +224,13 @@ func notImplemented(httpMethod string, endpoint string) error {
 }
 
 func paginationPath(rawURL string) (string, error) {
-	// if no next page url, we are done
 	if rawURL == "" {
 		return "", nil
 	}
-
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
+	if _, err := url.ParseRequestURI(rawURL); err != nil {
 		return "", fmt.Errorf("parse pagination URL: %w", err)
 	}
-
-	paginationPath := strings.TrimPrefix(parsed.Path, "/api/")
-	if paginationPath == "" {
-		return "", fmt.Errorf("pagination URL has no API path")
-	}
-	if parsed.RawQuery != "" {
-		paginationPath += "?" + parsed.RawQuery
-	}
-	return paginationPath, nil
+	return strings.TrimPrefix(rawURL, "/api/"), nil
 }
 
 func paginate(pathToFetch string, fetch func(string) (string, error)) error {

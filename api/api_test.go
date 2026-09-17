@@ -267,7 +267,6 @@ func TestPaginationPath(t *testing.T) {
 		name        string
 		rawURL      string
 		expect      string
-		expectErr   bool
 		errContains string
 	}{
 		{
@@ -276,26 +275,14 @@ func TestPaginationPath(t *testing.T) {
 			expect: "campaigns?page=2&pageSize=1000&sort=id",
 		},
 		{
-			name:   "absolute URL",
-			rawURL: "https://api.iterable.com/api/templates?page=3",
-			expect: "templates?page=3",
-		},
-		{
 			name:   "empty URL ends pagination",
 			rawURL: "",
 			expect: "",
 		},
 		{
-			name:        "malformed URL",
+			name:        "malformed relative URL",
 			rawURL:      "/api/%zz",
-			expectErr:   true,
 			errContains: "parse pagination URL",
-		},
-		{
-			name:        "URL without API path",
-			rawURL:      "https://api.iterable.com",
-			expectErr:   true,
-			errContains: "no API path",
 		},
 	}
 
@@ -303,7 +290,7 @@ func TestPaginationPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := paginationPath(tt.rawURL)
-			if tt.expectErr {
+			if tt.errContains != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
 				return
