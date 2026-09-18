@@ -41,21 +41,21 @@ func TestCampaigns_All(t *testing.T) {
 			name:      "successful response",
 			resBody:   []byte(`{"campaigns": [{"id": 123, "name": "Test Campaign"}]}`),
 			resCode:   200,
-			expectUrl: "https://api.iterable.com/api/campaigns",
+			expectUrl: "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectRes: []types.Campaign{{Id: 123, Name: "Test Campaign"}},
 		},
 		{
 			name:      "empty response",
 			resBody:   []byte(`{"campaigns": []}`),
 			resCode:   200,
-			expectUrl: "https://api.iterable.com/api/campaigns",
+			expectUrl: "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectRes: []types.Campaign{},
 		},
 		{
 			name:       "malformed json",
 			resBody:    []byte(`{"campaigns": [{"id":`),
 			resCode:    200,
-			expectUrl:  "https://api.iterable.com/api/campaigns",
+			expectUrl:  "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_JSON_PARSE,
 		},
@@ -63,7 +63,7 @@ func TestCampaigns_All(t *testing.T) {
 			name:       "server error",
 			resBody:    []byte(`{"message": "Internal Server Error"}`),
 			resCode:    500,
-			expectUrl:  "https://api.iterable.com/api/campaigns",
+			expectUrl:  "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_HTTP_STATUS,
 		},
@@ -71,7 +71,7 @@ func TestCampaigns_All(t *testing.T) {
 			name:       "too many requests",
 			resBody:    []byte(`Too Many Requests`),
 			resCode:    429,
-			expectUrl:  "https://api.iterable.com/api/campaigns",
+			expectUrl:  "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_HTTP_STATUS,
 		},
@@ -79,7 +79,7 @@ func TestCampaigns_All(t *testing.T) {
 			name:       "network error",
 			resErr:     assert.AnError,
 			resCode:    0,
-			expectUrl:  "https://api.iterable.com/api/campaigns",
+			expectUrl:  "https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_IO,
 		},
@@ -106,6 +106,82 @@ func TestCampaigns_All(t *testing.T) {
 			assert.Equal(t, tt.expectUrl, tr.Url())
 			assert.Equal(t, http.MethodGet, tr.Method())
 			assert.Equal(t, testApiKey, tr.ApiKey())
+		})
+	}
+}
+
+func TestCampaigns_All_Paginates(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		bodies        [][]byte
+		expectRes     []types.Campaign
+		expectURLs    []string
+		expectErr     bool
+		wantErrSubstr string
+	}{
+		{
+			name: "relative next page URL",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}]}`),
+			},
+			expectRes: []types.Campaign{
+				{Id: 1, Name: "Campaign 1"},
+				{Id: 2, Name: "Campaign 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
+			},
+		},
+
+		{
+			name: "cycle detection on first page",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "duplicate page request",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection across multiple pages",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"campaigns":[{"id":2,"name":"Campaign 2"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "duplicate page request",
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?page=2&pageSize=1000&sort=id",
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			transport := &scriptedTransport{bodies: tt.bodies}
+			client := &http.Client{Transport: transport}
+			api := NewCampaignsApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+
+			campaigns, err := api.All()
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.wantErrSubstr != "" {
+					assert.Contains(t, err.Error(), tt.wantErrSubstr)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectRes, campaigns)
+			}
+			assert.Equal(t, tt.expectURLs, transport.urls)
 		})
 	}
 }

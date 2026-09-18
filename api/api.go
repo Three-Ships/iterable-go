@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/Three-Ships/iterable-go/errors"
 	"github.com/Three-Ships/iterable-go/logger"
@@ -222,6 +224,39 @@ func notImplemented(httpMethod string, endpoint string) error {
 			"%s %s is not implemented", httpMethod, endpoint,
 		),
 	}
+}
+
+func paginationPath(rawURL string) (string, error) {
+	if rawURL == "" {
+		return "", nil
+	}
+	if _, err := url.ParseRequestURI(rawURL); err != nil {
+		return "", fmt.Errorf("parse pagination URL: %w", err)
+	}
+	return strings.TrimPrefix(rawURL, "/api/"), nil
+}
+
+func paginate(pathToFetch string, fetch func(string) (string, error)) error {
+	seen := make(map[string]struct{})
+
+	for pathToFetch != "" {
+		if _, exists := seen[pathToFetch]; exists {
+			return fmt.Errorf("duplicate page request")
+		}
+		seen[pathToFetch] = struct{}{}
+
+		nextURL, err := fetch(pathToFetch)
+		if err != nil {
+			return err
+		}
+
+		pathToFetch, err = paginationPath(nextURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type iterableErr struct {

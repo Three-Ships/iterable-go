@@ -10,6 +10,7 @@ import (
 	"github.com/Three-Ships/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTemplatesApi(t *testing.T) {
@@ -128,21 +129,21 @@ func TestTemplates_All(t *testing.T) {
 			name:      "successful response",
 			resBody:   []byte(`{"templates": [{"templateId": 1, "name": "Welcome"}]}`),
 			resCode:   200,
-			expectUrl: "https://api.iterable.com/api/templates",
+			expectUrl: "https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			expectRes: []types.Template{{TemplateId: 1, Name: "Welcome"}},
 		},
 		{
 			name:      "empty response",
 			resBody:   []byte(`{"templates": []}`),
 			resCode:   200,
-			expectUrl: "https://api.iterable.com/api/templates",
+			expectUrl: "https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			expectRes: []types.Template{},
 		},
 		{
 			name:       "malformed json",
 			resBody:    []byte(`{"templates": [{"templateId":`),
 			resCode:    200,
-			expectUrl:  "https://api.iterable.com/api/templates",
+			expectUrl:  "https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_JSON_PARSE,
 		},
@@ -150,7 +151,7 @@ func TestTemplates_All(t *testing.T) {
 			name:       "server error",
 			resBody:    []byte(`{"message": "Internal Server Error"}`),
 			resCode:    500,
-			expectUrl:  "https://api.iterable.com/api/templates",
+			expectUrl:  "https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_HTTP_STATUS,
 		},
@@ -158,7 +159,7 @@ func TestTemplates_All(t *testing.T) {
 			name:       "network error",
 			resErr:     assert.AnError,
 			resCode:    0,
-			expectUrl:  "https://api.iterable.com/api/templates",
+			expectUrl:  "https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
 			expectErr:  true,
 			resErrType: errors.TYPE_IO,
 		},
@@ -185,6 +186,82 @@ func TestTemplates_All(t *testing.T) {
 			assert.Equal(t, tt.expectUrl, tr.Url())
 			assert.Equal(t, http.MethodGet, tr.Method())
 			assert.Equal(t, testApiKey, tr.ApiKey())
+		})
+	}
+}
+
+func TestTemplates_All_Paginates(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		bodies        [][]byte
+		expectRes     []types.Template
+		expectURLs    []string
+		expectErr     bool
+		wantErrSubstr string
+	}{
+		{
+			name: "relative next page URL",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}]}`),
+			},
+			expectRes: []types.Template{
+				{TemplateId: 1, Name: "Template 1"},
+				{TemplateId: 2, Name: "Template 2"},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
+			},
+		},
+
+		{
+			name: "cycle detection on first page",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "duplicate page request",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+			},
+		},
+		{
+			name: "cycle detection across multiple pages",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"name":"Template 1"}],"nextPageUrl":"/api/templates?page=2&pageSize=1000&sort=id"}`),
+				[]byte(`{"templates":[{"templateId":2,"name":"Template 2"}],"nextPageUrl":"/api/templates?page=1&pageSize=1000&sort=id"}`),
+			},
+			expectErr:     true,
+			wantErrSubstr: "duplicate page request",
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?page=2&pageSize=1000&sort=id",
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			transport := &scriptedTransport{bodies: tt.bodies}
+			client := &http.Client{Transport: transport}
+			api := NewTemplatesApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+
+			templates, err := api.All()
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.wantErrSubstr != "" {
+					assert.Contains(t, err.Error(), tt.wantErrSubstr)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectRes, templates)
+			}
+			assert.Equal(t, tt.expectURLs, transport.urls)
 		})
 	}
 }

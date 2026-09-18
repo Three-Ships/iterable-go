@@ -15,6 +15,7 @@ import (
 	"github.com/Three-Ships/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -270,4 +271,124 @@ func (l *testRateLimiter) setLimitPath(path string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.limitByPaths[path] = true
+}
+
+func TestPaginationPath(t *testing.T) {
+	testCases := []struct {
+		name        string
+		rawURL      string
+		expect      string
+		errContains string
+	}{
+		{
+			name:   "relative URL",
+			rawURL: "/api/campaigns?page=2&pageSize=1000&sort=id",
+			expect: "campaigns?page=2&pageSize=1000&sort=id",
+		},
+		{
+			name:   "empty URL ends pagination",
+			rawURL: "",
+			expect: "",
+		},
+		{
+			name:        "malformed relative URL",
+			rawURL:      "/api/%zz",
+			errContains: "parse pagination URL",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := paginationPath(tt.rawURL)
+			if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expect, got)
+		})
+	}
+}
+
+func TestPaginate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		initialPath string
+		nextURLs    map[string]string
+		fetchErr    error
+		expectPaths []string
+		errContains string
+	}{
+		{
+			name:        "follows pages until empty continuation",
+			initialPath: "campaigns?page=1",
+			nextURLs: map[string]string{
+				"campaigns?page=1": "/api/campaigns?page=2",
+				"campaigns?page=2": "",
+			},
+			expectPaths: []string{"campaigns?page=1", "campaigns?page=2"},
+		},
+		{
+			name:        "detects cycle",
+			initialPath: "campaigns?page=1",
+			nextURLs: map[string]string{
+				"campaigns?page=1": "/api/campaigns?page=2",
+				"campaigns?page=2": "/api/campaigns?page=1",
+			},
+			expectPaths: []string{"campaigns?page=1", "campaigns?page=2"},
+			errContains: "duplicate page request",
+		},
+		{
+			name:        "returns fetch error",
+			initialPath: "campaigns?page=1",
+			fetchErr:    fmt.Errorf("request failed"),
+			expectPaths: []string{"campaigns?page=1"},
+			errContains: "request failed",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var paths []string
+			err := paginate(tt.initialPath, func(path string) (string, error) {
+				paths = append(paths, path)
+				if tt.fetchErr != nil {
+					return "", tt.fetchErr
+				}
+				return tt.nextURLs[path], nil
+			})
+			if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectPaths, paths)
+		})
+	}
+}
+
+type scriptedTransport struct {
+	mu     sync.Mutex
+	bodies [][]byte
+	urls   []string
+}
+
+func (t *scriptedTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.urls = append(t.urls, request.URL.String())
+	if len(t.bodies) == 0 {
+		return nil, fmt.Errorf("scriptedTransport: no more response bodies for %s", request.URL.String())
+	}
+	body := t.bodies[0]
+	t.bodies = t.bodies[1:]
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       &testReader{Reader: bytes.NewReader(body)},
+	}, nil
 }
