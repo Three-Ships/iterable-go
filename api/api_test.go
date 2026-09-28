@@ -116,6 +116,18 @@ func Test_sendJson_emptyAcceptedResponse(t *testing.T) {
 	assert.Equal(t, types.PostResponse{}, res)
 }
 
+func Test_sendJson_iterableErrorFields(t *testing.T) {
+	c := httpClient([]byte(`{"code":"BadParams","msg":"User does not exist"}`), http.StatusBadRequest, nil)
+	api := newApiClient(testApiKey, c, &logger.Noop{}, &rate.NoopLimiter{})
+
+	var res types.PostResponse
+	err := api.postJson("users/forget", nil, &res)
+
+	require.NotNil(t, err)
+	assert.Equal(t, "BadParams", err.IterableCode)
+	assert.Equal(t, "User does not exist", err.IterableMsg)
+}
+
 func TestApiClient_RateLimiting(t0 *testing.T) {
 	t0.Run("limited path", func(t *testing.T) {
 		limiter := newTestRateLimiter()

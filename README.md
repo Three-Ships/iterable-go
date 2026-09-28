@@ -74,6 +74,10 @@ you can provide a custom logger that implements the `logger.Logger` interface.
 
 For a more advanced logger implementation with colors and structured output, see [examples/logger_custom.go](./examples/logger_custom.go).
 
+### Errors
+
+Use `errors.IsForgottenUser(err)` and `errors.IsUserNotFound(err)` to detect the two user-state rejections without parsing responses yourself.
+
 ### Configuration
 
 #### NewClient Configuration Options
