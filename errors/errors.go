@@ -32,6 +32,8 @@ type ApiError struct {
 	HttpStatusCode int
 
 	IterableCode string
+	// IterableMsg is the "msg" field of an Iterable error response.
+	IterableMsg string
 }
 
 var _ error = &ApiError{}

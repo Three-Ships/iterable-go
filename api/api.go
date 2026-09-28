@@ -70,6 +70,7 @@ func (c *apiClient) sendJson(
 			err2 := json.Unmarshal(err.Body, &code)
 			if err2 == nil {
 				err.IterableCode = code.Code
+				err.IterableMsg = code.Msg
 			}
 			// Best effort to return some data
 			_ = json.Unmarshal(body, resData)
@@ -261,4 +262,5 @@ func paginate(pathToFetch string, fetch func(string) (string, error)) error {
 
 type iterableErr struct {
 	Code string `json:"code"`
+	Msg  string `json:"msg"`
 }
