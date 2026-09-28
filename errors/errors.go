@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -22,7 +23,13 @@ const (
 	ITERABLE_InvalidList             = "error.lists.invalidListId"
 	ITERABLE_Success                 = "Success"
 	ITERABLE_FieldTypeMismatchErrStr = "RequestFieldsTypesMismatched"
+	ITERABLE_ForgottenUserError      = "ForgottenUserError"
 )
+
+// userDoesNotExistMsg is how Iterable reports an unknown user on write
+// endpoints such as users/forget. It arrives in the "msg" field under a
+// generic code, so it can only be matched on the message text.
+const userDoesNotExistMsg = "user does not exist"
 
 type ApiError struct {
 	Stage          string
@@ -49,6 +56,25 @@ func (e *ApiError) Error() string {
 		"http request to Iterable failed during '%s' stage with error type '%s', httpStatus: '%d'; original err: %v",
 		e.Stage, e.Type, e.HttpStatusCode, err,
 	)
+}
+
+// IsForgottenUser reports whether Iterable rejected a request because the
+// user was forgotten (GDPR). Iterable rejects every write for a forgotten user.
+func IsForgottenUser(err error) bool {
+	var apiErr *ApiError
+	return errors.As(err, &apiErr) && apiErr.IterableCode == ITERABLE_ForgottenUserError
+}
+
+// IsUserNotFound reports whether Iterable has no user matching the request.
+// Lookup endpoints signal this with ITERABLE_NoUserWithIdExists; write
+// endpoints such as users/forget signal it only in the message text.
+func IsUserNotFound(err error) bool {
+	var apiErr *ApiError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.IterableCode == ITERABLE_NoUserWithIdExists ||
+		strings.Contains(strings.ToLower(apiErr.IterableMsg), userDoesNotExistMsg)
 }
 
 // Is method is required by errors.Is() to properly distinguish between
