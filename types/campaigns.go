@@ -2,6 +2,8 @@ package types
 
 import "time"
 
+// Campaign contains campaign metadata with epoch-millisecond timestamps.
+// Optional slices use omitzero to preserve explicit empty arrays during export.
 type Campaign struct {
 	Id                  int64    `json:"id"`
 	CreatedAt           int64    `json:"createdAt"`
@@ -14,13 +16,13 @@ type Campaign struct {
 	CreatedByUserId     string   `json:"createdByUserId"`
 	UpdatedByUserId     string   `json:"updatedByUserId,omitempty"`
 	CampaignState       string   `json:"campaignState"`
-	ListIds             []int64  `json:"listIds,omitempty"`
-	SuppressionListIds  []int64  `json:"suppressionListIds,omitempty"`
+	ListIds             []int64  `json:"listIds,omitzero"`
+	SuppressionListIds  []int64  `json:"suppressionListIds,omitzero"`
 	SendSize            int64    `json:"sendSize,omitempty"`
 	RecurringCampaignId int64    `json:"recurringCampaignId,omitempty"`
 	WorkflowId          int64    `json:"workflowId,omitempty"`
-	Labels              []string `json:"labels,omitempty"`
-	LabelIds            []int64  `json:"labelIds,omitempty"`
+	Labels              []string `json:"labels,omitzero"`
+	LabelIds            []int64  `json:"labelIds,omitzero"`
 	Type                string   `json:"type"`
 }
 

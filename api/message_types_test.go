@@ -75,7 +75,8 @@ func TestMessageTypes_Get(t *testing.T) {
 			resBody: []byte(`{
 				"messageTypes": [{
 					"id": 1,
-					"createdAt": 1,
+					"createdAt": 1785332762577,
+					"updatedAt": 1785459808994,
 					"name": "Complete Message Type",
 					"channelId": 100,
 					"subscriptionPolicy": "OptIn",
@@ -92,12 +93,13 @@ func TestMessageTypes_Get(t *testing.T) {
 				MessageTypes: []types.MessageType{
 					{
 						Id:                 1,
-						CreatedAt:          1,
+						CreatedAt:          1785332762577,
+						UpdatedAt:          1785459808994,
 						Name:               "Complete Message Type",
 						ChannelId:          100,
 						SubscriptionPolicy: "OptIn",
-						RateLimitPerMinute: 10,
-						FrequencyCap: types.FrequencyCap{
+						RateLimitPerMinute: new(int64(10)),
+						FrequencyCap: &types.FrequencyCap{
 							Days:     2,
 							Messages: 3,
 						},
