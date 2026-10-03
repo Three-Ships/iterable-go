@@ -40,8 +40,8 @@ func TestTemplates_Get(t *testing.T) {
 				"templates": [{
 					"templateId": 1,
 					"name": "Welcome",
-					"createdAt": "2026-09-01 12:00:00 +00:00",
-					"updatedAt": "2026-09-02 12:00:00 +00:00",
+					"createdAt": 1785461422350,
+					"updatedAt": 1789656739064,
 					"creatorUserId": "creator@example.com",
 					"messageTypeId": 2
 				}]
@@ -50,8 +50,8 @@ func TestTemplates_Get(t *testing.T) {
 			expectUrl: "https://api.iterable.com/api/templates",
 			expectRes: &types.TemplatesResponse{
 				Templates: []types.Template{{
-					TemplateId: 1, Name: "Welcome", CreatedAt: "2026-09-01 12:00:00 +00:00",
-					UpdatedAt: "2026-09-02 12:00:00 +00:00", CreatorUserId: "creator@example.com", MessageTypeId: 2,
+					TemplateId: 1, Name: "Welcome", CreatedAt: 1785461422350,
+					UpdatedAt: 1789656739064, CreatorUserId: "creator@example.com", MessageTypeId: 2,
 				}},
 			},
 		},
@@ -217,6 +217,21 @@ func TestTemplates_All_Paginates(t *testing.T) {
 			},
 		},
 
+		{
+			name: "numeric timestamps with count and filtered next page",
+			bodies: [][]byte{
+				[]byte(`{"templates":[{"templateId":1,"createdAt":1785461422350,"updatedAt":1789656739064}],"totalTemplatesCount":2,"nextPageUrl":"/api/templates?templateType=Base&messageMedium=Email&sort=id&pageSize=2&page=2"}`),
+				[]byte(`{"templates":[{"templateId":2,"createdAt":1785461422860,"updatedAt":1789656726058}],"totalTemplatesCount":2,"previousPageUrl":"/api/templates?sort=id&pageSize=2&page=1"}`),
+			},
+			expectRes: []types.Template{
+				{TemplateId: 1, CreatedAt: 1785461422350, UpdatedAt: 1789656739064},
+				{TemplateId: 2, CreatedAt: 1785461422860, UpdatedAt: 1789656726058},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/templates?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/templates?templateType=Base&messageMedium=Email&sort=id&pageSize=2&page=2",
+			},
+		},
 		{
 			name: "cycle detection on first page",
 			bodies: [][]byte{

@@ -138,6 +138,21 @@ func TestCampaigns_All_Paginates(t *testing.T) {
 		},
 
 		{
+			name: "numeric timestamps and count with relative next page",
+			bodies: [][]byte{
+				[]byte(`{"campaigns":[{"id":1,"createdAt":1785445662278,"updatedAt":1785458021025}],"totalCampaignsCount":2,"nextPageUrl":"/api/campaigns?sort=id&pageSize=2&page=2"}`),
+				[]byte(`{"campaigns":[{"id":2,"createdAt":1785501041472,"updatedAt":1785513355323}],"totalCampaignsCount":2,"previousPageUrl":"/api/campaigns?sort=id&pageSize=2&page=1"}`),
+			},
+			expectRes: []types.Campaign{
+				{Id: 1, CreatedAt: 1785445662278, UpdatedAt: 1785458021025},
+				{Id: 2, CreatedAt: 1785501041472, UpdatedAt: 1785513355323},
+			},
+			expectURLs: []string{
+				"https://api.iterable.com/api/campaigns?page=1&pageSize=1000&sort=id",
+				"https://api.iterable.com/api/campaigns?sort=id&pageSize=2&page=2",
+			},
+		},
+		{
 			name: "cycle detection on first page",
 			bodies: [][]byte{
 				[]byte(`{"campaigns":[{"id":1,"name":"Campaign 1"}],"nextPageUrl":"/api/campaigns?page=1&pageSize=1000&sort=id"}`),
