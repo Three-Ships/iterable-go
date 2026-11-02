@@ -161,7 +161,7 @@ The following table shows which [Iterable API endpoints](https://api.iterable.co
 | Delete a catalog item                                     | DELETE `/api/catalogs/{catalogName}/items/{itemId}`                   |           |       |
 | Get a specific catalog item                               | GET `/api/catalogs/{catalogName}/items/{itemId}`                      |           |       |
 | Create or update a catalog item                           | PATCH `/api/catalogs/{catalogName}/items/{itemId}`                    |           |       |
-| Create or replace a catalog item                          | PUT `/api/catalogs/{catalogName}/items/{itemId}`                      |           |       |
+| Create or replace a catalog item                          | PUT `/api/catalogs/{catalogName}/items/{itemId}`                      | ✅         |       |
 |                                                           |
 | **Channels**                                              |
 | Get channels                                              | GET `/api/channels`                                                   | ✅         |       |

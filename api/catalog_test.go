@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Three-Ships/iterable-go/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCatalogApi(t *testing.T) {
@@ -20,6 +22,151 @@ func TestNewCatalogApi(t *testing.T) {
 	assert.NotNil(t, api.api)
 	assert.Equal(t, testApiKey, api.api.apiKey)
 	assert.Equal(t, client, api.api.httpClient)
+}
+
+func TestCatalog_ReplaceItem(t *testing.T) {
+	testCases := []struct {
+		name       string
+		resBody    string
+		resCode    int
+		resErr     error
+		want       types.PostResponse
+		wantErr    string
+		wantStatus int
+	}{
+		{
+			name:    "accepted asynchronously",
+			resBody: `{"code":"Success","msg":"","params":{"catalogName":"weather","itemId":"edition"}}`,
+			resCode: http.StatusAccepted,
+			want:    types.PostResponse{Code: "Success", Params: map[string]interface{}{"catalogName": "weather", "itemId": "edition"}},
+		},
+		{
+			name:    "successful response",
+			resBody: `{"code":"Success","msg":"updated"}`,
+			resCode: http.StatusOK,
+			want:    types.PostResponse{Code: "Success", Message: "updated"},
+		},
+		{name: "empty accepted response", resCode: http.StatusAccepted},
+		{name: "malformed response", resCode: http.StatusOK, resBody: `{`, wantErr: errors.TYPE_JSON_PARSE, wantStatus: http.StatusOK},
+		{name: "invalid item", resCode: http.StatusBadRequest, resBody: `{"code":"BadParams","msg":"Invalid item"}`, wantErr: errors.TYPE_HTTP_STATUS, wantStatus: http.StatusBadRequest},
+		{name: "unauthorized", resCode: http.StatusUnauthorized, wantErr: errors.TYPE_HTTP_STATUS, wantStatus: http.StatusUnauthorized},
+		{name: "missing catalog", resCode: http.StatusNotFound, wantErr: errors.TYPE_HTTP_STATUS, wantStatus: http.StatusNotFound},
+		{name: "rate limited", resCode: http.StatusTooManyRequests, resBody: "Too Many Requests", wantErr: errors.TYPE_HTTP_STATUS, wantStatus: http.StatusTooManyRequests},
+		{name: "server failure", resCode: http.StatusServiceUnavailable, wantErr: errors.TYPE_HTTP_STATUS, wantStatus: http.StatusServiceUnavailable},
+		{name: "network failure", resErr: assert.AnError, wantErr: errors.TYPE_IO},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := httpClient([]byte(tt.resBody), tt.resCode, tt.resErr)
+			api := NewCatalogApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+			req := types.CatalogItemReplaceRequest{
+				Value: map[string]any{
+					"days": []map[string]any{{
+						"date": "2026-10-30",
+						"segments": []map[string]any{{
+							"temperature_f":        0,
+							"precipitation_chance": nil,
+						}},
+					}},
+				},
+			}
+
+			res, err := api.ReplaceItem("brand-weather", "edition-key", req)
+			if tt.wantErr != "" {
+				var apiErr *errors.ApiError
+				require.ErrorAs(t, err, &apiErr)
+				assert.Equal(t, tt.wantErr, apiErr.Type)
+				assert.Equal(t, tt.wantStatus, apiErr.HttpStatusCode)
+				if tt.resErr != nil {
+					assert.ErrorIs(t, apiErr.SourceErr, tt.resErr)
+				}
+				if tt.resCode == http.StatusBadRequest {
+					assert.Equal(t, "BadParams", apiErr.IterableCode)
+					assert.Equal(t, "Invalid item", apiErr.IterableMsg)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, &tt.want, res)
+			}
+
+			tr := client.Transport.(*testTransport)
+			assert.Equal(t, "https://api.iterable.com/api/catalogs/brand-weather/items/edition-key", tr.Url())
+			assert.Equal(t, http.MethodPut, tr.Method())
+			assert.Equal(t, testApiKey, tr.ApiKey())
+			assert.Equal(t, "application/json", tr.req.Header.Get("Content-Type"))
+			assert.Equal(t, "application/json", tr.req.Header.Get("Accept"))
+			body, readErr := io.ReadAll(tr.req.Body)
+			require.NoError(t, readErr)
+			assert.JSONEq(t, `{"value":{"days":[{"date":"2026-10-30","segments":[{"temperature_f":0,"precipitation_chance":null}]}]}}`, string(body))
+			if tt.resErr == nil {
+				assert.True(t, tr.res.Body.(*testReader).isClosed)
+			}
+		})
+	}
+}
+
+func TestCatalog_ReplaceItemValue(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		value any
+	}{
+		{
+			name:  "map",
+			value: map[string]any{"name": "Example", "count": 0},
+		},
+		{
+			name: "struct",
+			value: struct {
+				Name  string `json:"name"`
+				Count int    `json:"count"`
+			}{Name: "Example"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := httpClient(nil, http.StatusAccepted, nil)
+			api := NewCatalogApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+
+			_, err := api.ReplaceItem("catalog", "item", types.CatalogItemReplaceRequest{Value: tt.value})
+			require.NoError(t, err)
+
+			body, err := io.ReadAll(client.Transport.(*testTransport).req.Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, `{"value":{"name":"Example","count":0}}`, string(body))
+		})
+	}
+}
+
+func TestCatalog_ReplaceItemUnencodableValue(t *testing.T) {
+	client := httpClient(nil, http.StatusAccepted, nil)
+	api := NewCatalogApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+
+	_, err := api.ReplaceItem("weather", "edition", types.CatalogItemReplaceRequest{
+		Value: map[string]any{"invalid": make(chan int)},
+	})
+
+	var apiErr *errors.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, errors.STAGE_BEFORE_REQUEST, apiErr.Stage)
+	assert.Equal(t, errors.TYPE_JSON_PARSE, apiErr.Type)
+	assert.Nil(t, client.Transport.(*testTransport).req)
+}
+
+func TestCatalog_ReplaceItemEscapesPathParameters(t *testing.T) {
+	client := httpClient(nil, http.StatusAccepted, nil)
+	api := NewCatalogApi(testApiKey, client, &logger.Noop{}, &rate.NoopLimiter{})
+
+	_, err := api.ReplaceItem("catalog/other", "item?query=value#fragment", types.CatalogItemReplaceRequest{
+		Value: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	tr := client.Transport.(*testTransport)
+	assert.Equal(t, "https://api.iterable.com/api/catalogs/catalog%2Fother/items/item%3Fquery=value%23fragment", tr.Url())
+	assert.Empty(t, tr.req.URL.RawQuery)
+	assert.Empty(t, tr.req.URL.Fragment)
 }
 
 func TestCatalog_All(t *testing.T) {
