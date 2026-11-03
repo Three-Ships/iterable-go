@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/Three-Ships/iterable-go/logger"
@@ -32,6 +33,17 @@ func NewCatalogApi(apiKey string, httpClient *http.Client, logger logger.Logger,
 func (c *Catalog) All() (*types.Catalogs, error) {
 	var response types.Catalogs
 	return toNilErr(&response, c.api.getJson(PathCatalogs, &response))
+}
+
+// ReplaceItem creates or replaces an item, deleting fields omitted from req.Value.
+// Success means Iterable accepted the asynchronous write; visibility may lag.
+func (c *Catalog) ReplaceItem(catalogName, itemID string, req types.CatalogItemReplaceRequest) (*types.PostResponse, error) {
+	var response types.PostResponse
+	path := strings.NewReplacer(
+		"{catalogName}", url.PathEscape(catalogName),
+		"{itemId}", url.PathEscape(itemID),
+	).Replace(PathCatalogItem)
+	return toNilErr(&response, c.api.sendJson(http.MethodPut, path, req, &response))
 }
 
 func (c *Catalog) FieldMapping(catalogName string) (*types.CatalogFieldMapping, error) {
