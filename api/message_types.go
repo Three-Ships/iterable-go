@@ -17,8 +17,13 @@ type MessageTypes struct {
 }
 
 func NewMessageTypesApi(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter) *MessageTypes {
+	return NewMessageTypesApiWithOptions(apiKey, httpClient, logger, limiter)
+}
+
+// NewMessageTypesApiWithOptions creates a message types API with the given options.
+func NewMessageTypesApiWithOptions(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter, opts ...Option) *MessageTypes {
 	return &MessageTypes{
-		api: newApiClient(apiKey, httpClient, logger, limiter),
+		api: newApiClient(apiKey, httpClient, logger, limiter, opts...),
 	}
 }
 

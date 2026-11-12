@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Three-Ships/iterable-go/api"
 	"github.com/Three-Ships/iterable-go/logger"
 	"github.com/Three-Ships/iterable-go/rate"
 )
@@ -30,6 +31,8 @@ type config struct {
 	// sent to Iterable API
 	// default: rate.NoopLimiter
 	limiter rate.Limiter
+
+	apiOpts []api.Option
 }
 
 func defaultConfig() *config {
@@ -42,6 +45,11 @@ func defaultConfig() *config {
 }
 
 type ConfigOption func(c *config)
+
+// WithEU connects the client to Iterable's European data center.
+func WithEU() ConfigOption {
+	return func(c *config) { c.apiOpts = []api.Option{api.WithEU()} }
+}
 
 func WithTransport(transport http.RoundTripper) ConfigOption {
 	return func(c *config) {

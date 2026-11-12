@@ -32,15 +32,15 @@ func NewClient(apiKey string, opts ...ConfigOption) *Client {
 
 	return &Client{
 		httpClient:    httpClient,
-		campaigns:     api.NewCampaignsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		catalog:       api.NewCatalogApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		lists:         api.NewListsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		channels:      api.NewChannelsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		users:         api.NewUsersApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		events:        api.NewEventsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		messageTypes:  api.NewMessageTypesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		subscriptions: api.NewSubscriptionsApi(apiKey, httpClient, cfg.logger, cfg.limiter),
-		templates:     api.NewTemplatesApi(apiKey, httpClient, cfg.logger, cfg.limiter),
+		campaigns:     api.NewCampaignsApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		catalog:       api.NewCatalogApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		lists:         api.NewListsApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		channels:      api.NewChannelsApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		users:         api.NewUsersApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		events:        api.NewEventsApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		messageTypes:  api.NewMessageTypesApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		subscriptions: api.NewSubscriptionsApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
+		templates:     api.NewTemplatesApiWithOptions(apiKey, httpClient, cfg.logger, cfg.limiter, cfg.apiOpts...),
 	}
 }
 

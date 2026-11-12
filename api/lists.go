@@ -26,8 +26,13 @@ type Lists struct {
 }
 
 func NewListsApi(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter) *Lists {
+	return NewListsApiWithOptions(apiKey, httpClient, logger, limiter)
+}
+
+// NewListsApiWithOptions creates a lists API with the given options.
+func NewListsApiWithOptions(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter, opts ...Option) *Lists {
 	return &Lists{
-		api: newApiClient(apiKey, httpClient, logger, limiter),
+		api: newApiClient(apiKey, httpClient, logger, limiter, opts...),
 	}
 }
 

@@ -21,8 +21,13 @@ type Subscriptions struct {
 }
 
 func NewSubscriptionsApi(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter) *Subscriptions {
+	return NewSubscriptionsApiWithOptions(apiKey, httpClient, logger, limiter)
+}
+
+// NewSubscriptionsApiWithOptions creates a subscriptions API with the given options.
+func NewSubscriptionsApiWithOptions(apiKey string, httpClient *http.Client, logger logger.Logger, limiter rate.Limiter, opts ...Option) *Subscriptions {
 	return &Subscriptions{
-		api: newApiClient(apiKey, httpClient, logger, limiter),
+		api: newApiClient(apiKey, httpClient, logger, limiter, opts...),
 	}
 }
 

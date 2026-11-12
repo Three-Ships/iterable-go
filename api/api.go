@@ -15,14 +15,24 @@ import (
 )
 
 const (
-	baseUrl = "https://api.iterable.com/api"
+	baseUrl   = "https://api.iterable.com/api"
+	euBaseUrl = "https://api.eu.iterable.com/api"
 )
 
 type apiClient struct {
 	apiKey     string
+	baseUrl    string
 	httpClient *http.Client
 	logger     logger.Logger
 	limiter    rate.Limiter
+}
+
+// Option configures an API client.
+type Option func(*apiClient)
+
+// WithEU sends requests to Iterable's European data center.
+func WithEU() Option {
+	return func(c *apiClient) { c.baseUrl = euBaseUrl }
 }
 
 func newApiClient(
@@ -30,13 +40,19 @@ func newApiClient(
 	httpClient *http.Client,
 	logger logger.Logger,
 	limiter rate.Limiter,
+	opts ...Option,
 ) *apiClient {
-	return &apiClient{
+	c := &apiClient{
 		apiKey:     apiKey,
+		baseUrl:    baseUrl,
 		httpClient: httpClient,
 		logger:     logger,
 		limiter:    limiter,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (c *apiClient) getJson(path string, resData any) *errors.ApiError {
@@ -122,7 +138,7 @@ func (c *apiClient) send(
 	contentType string,
 	accept string,
 ) ([]byte, *errors.ApiError) {
-	endpoint := baseUrl + "/" + path
+	endpoint := c.baseUrl + "/" + path
 
 	var err error
 	var req *http.Request

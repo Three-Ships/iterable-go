@@ -89,6 +89,12 @@ The `NewClient` function accepts various configuration options to customize the 
 | `WithTimeout`   | `time.Duration`     | `10 * time.Second`      | HTTP request timeout         | `iterable_go.WithTimeout(30*time.Second)`    |
 | `WithTransport` | `http.RoundTripper` | `http.DefaultTransport` | Custom HTTP transport        | `iterable_go.WithTransport(customTransport)` |
 | `WithLogger`    | `logger.Logger`     | `logger.Noop{}`         | Custom logger implementation | `iterable_go.WithLogger(myLogger)`           |
+| `WithEU`        | —                   | US data center          | Use the European data center | `iterable_go.WithEU()`                       |
+
+For EU projects, use `iterable_go.NewClient("your-eu-api-key", iterable_go.WithEU())`.
+Batch operations use the same region as their client. If constructing APIs directly
+from the `api` package, use the `WithOptions` constructor, for example
+`api.NewChannelsApiWithOptions(key, httpClient, logger, limiter, api.WithEU())`.
 
 **Example:**
 ```go
